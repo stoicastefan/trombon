@@ -88,7 +88,7 @@ game_over = False
 
 def create_deck():
     ranks = ['2', '3', '4', '5', '6', '7', '8', '9', '10', 'J', 'Q', 'K', 'A']
-    suits = ['hearts', 'diamonds', 'clubs', 'spades']
+    suits = ['♥', '♦', '♣', '♠']
     deck = [(rank, suit) for rank in ranks for suit in suits]
     return deck
 
@@ -202,6 +202,9 @@ def player_actions():
             game_over = True
             return game_over
         cards_to_play = [int(card) for card in play.split(",")]
+        if len(cards_to_play) > 3:
+            print('You can only place a maximum of 3 cards!')
+            player_actions()
         selected_cards = []
         for card in cards_to_play:
             selected_cards.append((players[current_player]['hand'][card]))
