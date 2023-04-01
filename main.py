@@ -76,7 +76,7 @@ import sys
 
 # needed variable
 
-players = [{'username': 'Radu', 'hand': [], 'index': 0}, {'username': 'Stefan', 'hand': [], 'index': 1}, {'username': 'Paul', 'hand': [], 'index': 2}]
+players = [{'username': 'Radu', 'hand': []}, {'username': 'Stefan', 'hand': []}, {'username': 'Paul', 'hand': []}, {'username': 'Cristian', 'hand': []}]
 num_players = len(players)
 cards_on_table = []
 selected_cards = []
@@ -173,7 +173,6 @@ def player_actions():
     play = input("Select cards to play (comma-separated) or 't' to trombon: ")
     if play == 't':
         if all([card[0] == claimed_card for card in selected_cards]):
-            # The selected cards have the same value as the claimed card
             print("Selected cards have the same value as the claimed card.")
             print(players[current_player]['username'] + " draws the cards on table.")
             players[current_player]['hand'].extend(cards_on_table)
@@ -182,11 +181,10 @@ def player_actions():
                 print(players[current_player - 1]['username'] + " wins!")
                 game_over = True
                 return game_over
-            current_player = (current_player + 1) % num_players  # Update current player
+            current_player = (current_player + 1) % num_players
             turn_ended = True
             return current_player, turn_ended
         else:
-            # The selected cards do not have the same value as the claimed card
             print("Selected cards do not have the same value as the claimed card.")
             previous_player = current_player - 1
             if previous_player < 0:
@@ -215,7 +213,6 @@ def player_actions():
         print('Cards on table are:' + '\n' + str(cards_on_table))
         player_actions()
 
-    # add the played cards to the cards on table
     return selected_cards, cards_on_table, current_player
 
 game_setup()
