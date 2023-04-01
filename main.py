@@ -3,7 +3,7 @@ from flask_socketio import SocketIO, emit, disconnect, send
 from threading import Lock
 from flask_socketio import join_room, leave_room
 import random
-
+import sys
 # async_mode = None
 # app = Flask(__name__)
 # app.config['SECRET_KEY'] = 'secret!'
@@ -74,9 +74,17 @@ import random
 # if __name__ == '__main__':
 #     socket_.run(app, debug=True, allow_unsafe_werkzeug=True)
 
+# needed variable
 
-
-players = [{'username': 'Player 1', 'hand': []}, {'username': 'Player 2', 'hand': []}, {'username': 'Player 3', 'hand': []}]
+players = [{'username': 'Radu', 'hand': [], 'index': 0}, {'username': 'Stefan', 'hand': [], 'index': 1}, {'username': 'Paul', 'hand': [], 'index': 2}]
+num_players = len(players)
+cards_on_table = []
+selected_cards = []
+current_player = 0
+start_game = True
+claimed_card = ''
+turn_ended = False
+game_over = False
 
 def create_deck():
     ranks = ['2', '3', '4', '5', '6', '7', '8', '9', '10', 'J', 'Q', 'K', 'A']
@@ -84,85 +92,140 @@ def create_deck():
     deck = [(rank, suit) for rank in ranks for suit in suits]
     return deck
 
-def shuffle_deck(deck):
-    random.shuffle(deck)
+deck = create_deck()
+num_cards = len(deck)
 
-def play_game(deck, players):
-    trombon = False
-    num_players = len(players)
-    num_cards = len(deck) // num_players  # integer division
+def shuffle_deck(deck):
+    return random.shuffle(deck)
+
+def deal_cards(deck, players):
+    num_cards = len(deck) // num_players
+
     for i in range(num_players):
         hand = []
         for j in range(num_cards):
-            hand.append(deck.pop())
+            if deck:
+                hand.append(deck.pop())
         players[i]['hand'] = hand
-    # Deal remaining cards to last player, if any
-    if len(deck) > 0:
-        for card in deck:
-            players[-1]['hand'].append(deck.pop())
-    turn = 0
-    if turn == 0:
-        claimed_card = input('Claim a card value:')
-    cards_on_table = []
-    while True:
-        if trombon == True:
-            if trombon == True:
-                # Check if the selected cards have the same value as the claimed value of the card
-                selected_card_values = [card[0] for card in selected_cards]
-                if claimed_card in selected_card_values:
-                    print("Selected cards have the same value as the claimed card.")
-                    print("Player who pressed trombon draws the cards on table.")
-                    players[turn]['hand'].extend(cards_on_table)
-                    cards_on_table = []
-                    # Reset turn to the player who pressed trombon
-                    turn = (turn - 1) % num_players
-                else:
-                    print("Selected cards do not have the same value as the claimed card.")
-                    print("Player who selected the cards draws the cards on table.")
-                    players[turn]['hand'].extend(cards_on_table)
-                    cards_on_table = []
-                    turn = (turn + 1) % num_players
-                trombon = False
 
-            pass
-            #Check if the selected cards have the same value as the claimed value of the card
-            #If it is the same, the person who pressed trombon draws
-            #If not, the person who selected the cards draws the cards_on_table
-            #cards_on_table = []
-            #turn = 0 to reset game
-            #The next person after the one that drew the cards now starts
-        player = players[turn]
-        print(player['username'] + "'s turn")
-        print("Current hand:")
+    if deck:
+        for card in deck:
+            players[-1]['hand'].append(card)
+
+def show_cards():
+    for player in players:
         print(player['hand'])
-        play = input("Select cards to play (comma-separated): ")
+
+def game_setup():
+    shuffle_deck(deck)
+    deal_cards(deck, players)
+
+def check_quads():
+    global players
+
+    # create a dictionary how many times a certain element is in the list
+    count_dict = {}
+
+    for item in players[current_player]['hand']:
+        if item[0] in count_dict:
+            count_dict[item[0]] += 1
+        else:
+            count_dict[item[0]] = 1
+
+    to_remove = []
+
+    for key in count_dict:
+        if count_dict[key] == 4:
+            print('You have quad ' + key)
+            to_remove += [item for item in players[current_player]['hand'] if item[0] == key]
+
+    for item in to_remove:
+        players[current_player]['hand'].remove(item)
+
+def new_turn():
+    global cards_on_table, current_player, players, selected_cards, cards_on_table, claimed_card
+
+    print(players[current_player]['username'])
+    print(players[current_player]['hand'])
+    claimed_card = input("Claim a card value:")
+    play = input("Select cards to play (comma-separated):")
+    cards_to_play = [int(card) for card in play.split(",")]
+    selected_cards = []
+    for card in cards_to_play:
+        selected_cards.append((players[current_player]['hand'][card]))
+        if len(selected_cards) > 3:
+            print('You can only place a maximum of 3 cards!')
+            new_turn()
+    for card in selected_cards:
+        players[current_player]['hand'].remove(card)
+        cards_on_table.append(card)
+    current_player += 1
+    return selected_cards, cards_on_table, current_player, claimed_card
+
+def player_actions():
+    global cards_on_table, current_player, players, selected_cards, claimed_card, turn_ended, game_over
+    turn_ended = False
+    if current_player > len(players) - 1:
+        current_player = 0
+    check_quads()
+    print(players[current_player]['username'])
+    print(players[current_player]['hand'])
+    play = input("Select cards to play (comma-separated) or 't' to trombon: ")
+    if play == 't':
+        if all([card[0] == claimed_card for card in selected_cards]):
+            # The selected cards have the same value as the claimed card
+            print("Selected cards have the same value as the claimed card.")
+            print(players[current_player]['username'] + " draws the cards on table.")
+            players[current_player]['hand'].extend(cards_on_table)
+            cards_on_table = []
+            if len(players[current_player - 1]['hand']) == 0:
+                print(players[current_player - 1]['username'] + " wins!")
+                game_over = True
+                return game_over
+            current_player = (current_player + 1) % num_players  # Update current player
+            turn_ended = True
+            return current_player, turn_ended
+        else:
+            # The selected cards do not have the same value as the claimed card
+            print("Selected cards do not have the same value as the claimed card.")
+            previous_player = current_player - 1
+            if previous_player < 0:
+                previous_player = len(players) - 1
+            players[previous_player]['hand'].extend(cards_on_table)
+            print(players[previous_player]['username'] + " draws the cards on table.")
+            cards_on_table = []
+            turn_ended = True
+            return current_player, turn_ended
+    else:
+        if len(players[current_player - 1]['hand']) == 0:
+            print(players[current_player]['username'] + " wins!")
+            game_over = True
+            return game_over
         cards_to_play = [int(card) for card in play.split(",")]
         selected_cards = []
         for card in cards_to_play:
-            selected_cards.append(player['hand'][card])
+            selected_cards.append((players[current_player]['hand'][card]))
         for card in selected_cards:
-            player['hand'].remove(card)
+            players[current_player]['hand'].remove(card)
             cards_on_table.append(card)
-        print(player['username'] + " plays:")
-        print(selected_cards)
+        current_player += 1
+        print('Cards on table are:' + '\n' + str(cards_on_table))
+        player_actions()
 
-        turn = (turn + 1) % num_players
+    # add the played cards to the cards on table
+    return selected_cards, cards_on_table, current_player
 
-        if len(deck) == 0 and all([len(player['hand']) == 0 for player in players]):
-            print("Cards on table:")
-            print(cards_on_table)
-            break
+game_setup()
+if game_over == True:
+    current_player = 0
+    start_game = True
 
-deck = create_deck()
-shuffle_deck(deck)
-play_game(deck, players)
-player_count = 0
+if start_game == True :
+    print("New game!")
+    new_turn()
+    player_actions()
 
-# for player in players:
-#     print(player['username'] + "'s hand:")
-#     print(player['hand'])
-#     print()
-
-
-
-
+while turn_ended == True:
+    print('New turn!')
+    new_turn()
+    player_actions()
